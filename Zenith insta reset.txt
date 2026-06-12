@@ -1,0 +1,333 @@
+if not game:IsLoaded() then game.Loaded:Wait() end
+task.spawn(function()
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+
+local lp = Players.LocalPlayer
+if not lp.Character then lp.CharacterAdded:Wait() end
+local M = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+local GUID = "f888ee6e-c86d-46e1-93d7-0639d6635d42"
+local CFGFILE = "balloonresetcfg.json"
+
+local defCfg = { autoOn = true, resetKey = "B" }
+local cfg = {}
+local function loadCfg()
+    if isfile and isfile(CFGFILE) then
+        local ok, data = pcall(function() return HttpService:JSONDecode(readfile(CFGFILE)) end)
+        if ok and type(data) == "table" then
+            for k, v in pairs(defCfg) do cfg[k] = (data[k] ~= nil) and data[k] or v end
+            return
+        end
+    end
+    for k, v in pairs(defCfg) do cfg[k] = v end
+end
+loadCfg()
+local saveQueued = false
+local function qSave()
+    if saveQueued then return end
+    saveQueued = true
+    task.delay(1, function()
+        saveQueued = false
+        if writefile then pcall(function() writefile(CFGFILE, HttpService:JSONEncode(cfg)) end) end
+    end)
+end
+
+local function rStr()
+    local c = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    local r = ""
+    for _ = 1, math.random(10, 20) do r = r .. c:sub(math.random(1, #c), math.random(1, #c)) end
+    return r
+end
+
+local function mkLabel(parent, props)
+    local l = Instance.new("TextLabel")
+    l.Name = rStr(); l.BackgroundTransparency = 1; l.Selectable = false
+    for k, v in pairs(props) do l[k] = v end
+    l.Parent = parent
+    return l
+end
+local function mkCorner(parent, radius)
+    local c = Instance.new("UICorner"); c.Name = rStr(); c.CornerRadius = UDim.new(0, radius); c.Parent = parent; return c
+end
+local function mkStroke(parent, thick, color, trans)
+    local s = Instance.new("UIStroke"); s.Name = rStr()
+    s.Color = color or Color3.fromRGB(255,255,255); s.Thickness = thick or 1
+    s.Transparency = trans or 0.6
+    s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; s.Parent = parent
+    return s
+end
+
+local playerGui = lp:WaitForChild("PlayerGui")
+local sg = Instance.new("ScreenGui")
+sg.Name = rStr(); sg.ResetOnSpawn = false; sg.DisplayOrder = 2147483647
+sg.Parent = playerGui
+
+-- Kanye Hub style sizing
+local CW = M and 185 or 220
+local BANNER_H = M and 42 or 48
+local GAP = M and 5 or 7
+local EXEC_H = M and 32 or 38
+local cardH = BANNER_H + GAP + EXEC_H
+
+local outer = Instance.new("Frame"); outer.Name = rStr()
+outer.Size = UDim2.new(0, CW, 0, cardH); outer.AnchorPoint = Vector2.new(0.5, 0)
+outer.Position = UDim2.new(0.5, 0, 0, M and 80 or 110)
+outer.BackgroundTransparency = 1; outer.Parent = sg
+
+-- Outer wrapper card (white border, dark green tint) wrapping banner + button
+local wrap = Instance.new("Frame"); wrap.Name = rStr()
+wrap.Size = UDim2.new(1, 0, 0, BANNER_H + GAP + EXEC_H)
+wrap.Position = UDim2.new(0, 0, 0, 0)
+wrap.BackgroundColor3 = Color3.fromRGB(15,8,8)
+wrap.BackgroundTransparency = 0.15
+wrap.BorderSizePixel = 0
+wrap.Parent = outer
+mkCorner(wrap, M and 12 or 14)
+mkStroke(wrap, 1.5, Color3.fromRGB(220,30,30), 0.25)
+
+-- ===== Top banner (translucent dark glass card, like INSTA RESET .GG/KANYEHUB) =====
+local banner = Instance.new("Frame"); banner.Name = rStr()
+banner.Size = UDim2.new(1, -10, 0, BANNER_H - 6)
+banner.Position = UDim2.new(0, 5, 0, 5)
+banner.BackgroundColor3 = Color3.fromRGB(35,15,15)
+banner.BackgroundTransparency = 0.3
+banner.BorderSizePixel = 0
+banner.Parent = wrap
+mkCorner(banner, M and 10 or 12)
+
+local titleLbl = mkLabel(banner, {
+    Position = UDim2.new(0, M and 12 or 14, 0, M and 6 or 8),
+    Size = UDim2.new(1, M and -46 or -52, 0, M and 18 or 20),
+    Text = "ZENITH HUB",
+    Font = Enum.Font.GothamBlack, TextSize = M and 14 or 16,
+    TextColor3 = Color3.fromRGB(255,255,255),
+    TextXAlignment = Enum.TextXAlignment.Left,
+})
+
+local subLbl = mkLabel(banner, {
+    Position = UDim2.new(0, M and 12 or 14, 0, M and 24 or 28),
+    Size = UDim2.new(1, M and -46 or -52, 0, M and 14 or 16),
+    Text = ".GG/JTYEP47CX",
+    Font = Enum.Font.GothamBold, TextSize = M and 10 or 12,
+    TextColor3 = Color3.fromRGB(225,225,230),
+    TextXAlignment = Enum.TextXAlignment.Left,
+})
+
+-- gear / settings icon (top-right of banner) toggles the options panel
+local gearBtn = Instance.new("TextButton"); gearBtn.Name = rStr(); gearBtn.Parent = banner
+gearBtn.Size = UDim2.new(0, M and 26 or 30, 0, M and 26 or 30)
+gearBtn.Position = UDim2.new(1, M and -8 or -10, 0, M and 6 or 8)
+gearBtn.AnchorPoint = Vector2.new(1, 0)
+gearBtn.BackgroundColor3 = Color3.fromRGB(60,15,15)
+gearBtn.BackgroundTransparency = 0.2
+gearBtn.Text = "⚙"
+gearBtn.Font = Enum.Font.GothamBold
+gearBtn.TextSize = M and 14 or 16
+gearBtn.TextColor3 = Color3.fromRGB(255,255,255)
+gearBtn.BorderSizePixel = 0
+gearBtn.AutoButtonColor = false
+gearBtn.Selectable = false
+mkCorner(gearBtn, M and 8 or 9)
+
+-- ===== Main button (INSTA RESET) =====
+local eb = Instance.new("TextButton"); eb.Name = rStr(); eb.Parent = wrap
+eb.Size = UDim2.new(1, -10, 0, EXEC_H)
+eb.Position = UDim2.new(0, 5, 0, BANNER_H + GAP)
+eb.BackgroundColor3 = Color3.fromRGB(160,20,20)
+eb.Text = "INSTA RESET"
+eb.Font = Enum.Font.GothamBlack
+eb.TextSize = M and 13 or 15
+eb.TextColor3 = Color3.fromRGB(255,255,255)
+eb.BorderSizePixel = 0
+eb.AutoButtonColor = false
+eb.Selectable = false
+mkCorner(eb, M and 14 or 16)
+mkStroke(eb, 1, Color3.fromRGB(255,255,255), 0.5)
+if not M then
+    eb.MouseEnter:Connect(function() TweenService:Create(eb, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(190,30,30)}):Play() end)
+    eb.MouseLeave:Connect(function() TweenService:Create(eb, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(160,20,20)}):Play() end)
+end
+
+-- ===== Hidden options panel (Auto Reset toggle + key bind), opened via gear =====
+local OPT_H = M and 84 or 96
+local optPanel = Instance.new("Frame"); optPanel.Name = rStr()
+optPanel.Size = UDim2.new(1, 0, 0, OPT_H)
+optPanel.Position = UDim2.new(0, 0, 0, BANNER_H + GAP + EXEC_H + GAP)
+optPanel.BackgroundColor3 = Color3.fromRGB(15,8,8)
+optPanel.BackgroundTransparency = 0.1
+optPanel.BorderSizePixel = 0
+optPanel.Visible = false
+optPanel.Parent = outer
+mkCorner(optPanel, M and 12 or 14)
+mkStroke(optPanel, 1, Color3.fromRGB(220,30,30), 0.5)
+
+gearBtn.MouseButton1Click:Connect(function()
+    optPanel.Visible = not optPanel.Visible
+    local newH = optPanel.Visible and (BANNER_H + GAP + EXEC_H + GAP + OPT_H) or (BANNER_H + GAP + EXEC_H)
+    outer.Size = UDim2.new(0, CW, 0, newH)
+end)
+
+-- Auto reset toggle row
+local ROW_H = M and 28 or 32
+local tf = Instance.new("Frame"); tf.Name = rStr()
+tf.Size = UDim2.new(1, -16, 0, ROW_H)
+tf.Position = UDim2.new(0, 8, 0, 10)
+tf.BackgroundColor3 = Color3.fromRGB(25,10,10)
+tf.BackgroundTransparency = 0.1
+tf.BorderSizePixel = 0
+tf.Parent = optPanel
+mkCorner(tf, M and 6 or 8)
+
+mkLabel(tf, {
+    Position = UDim2.new(0, 10, 0, 0), Size = UDim2.new(1, -60, 1, 0),
+    Text = "AUTO RESET ON BALLOON", Font = Enum.Font.GothamBold, TextSize = M and 10 or 12,
+    TextColor3 = Color3.fromRGB(235,235,240), TextXAlignment = Enum.TextXAlignment.Left,
+})
+
+local togBtn = Instance.new("TextButton"); togBtn.Name = rStr(); togBtn.Parent = tf
+togBtn.Size = UDim2.new(0, M and 22 or 26, 0, M and 12 or 14)
+togBtn.Position = UDim2.new(1, -9, 0.5, 0); togBtn.AnchorPoint = Vector2.new(1, 0.5)
+togBtn.BackgroundColor3 = Color3.fromRGB(80,15,15)
+togBtn.Text = ""
+togBtn.BorderSizePixel = 0
+togBtn.AutoButtonColor = false
+togBtn.Selectable = false
+mkCorner(togBtn, 100)
+
+local ind = Instance.new("Frame"); ind.Name = rStr(); ind.Parent = togBtn
+ind.Size = UDim2.new(0, M and 8 or 10, 0, M and 8 or 10)
+ind.Position = UDim2.new(0, 2, 0.5, 0); ind.AnchorPoint = Vector2.new(0, 0.5)
+ind.BackgroundColor3 = Color3.fromRGB(255,255,255)
+ind.BorderSizePixel = 0
+mkCorner(ind, 100)
+
+local function tweenTgl(on)
+    local tP = on and UDim2.new(1, M and -10 or -12, 0.5, 0) or UDim2.new(0, 2, 0.5, 0)
+    TweenService:Create(ind, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Position = tP}):Play()
+    TweenService:Create(togBtn, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundColor3 = on and Color3.fromRGB(160,20,20) or Color3.fromRGB(80,15,15)}):Play()
+end
+tweenTgl(cfg.autoOn)
+togBtn.MouseButton1Click:Connect(function()
+    cfg.autoOn = not cfg.autoOn
+    tweenTgl(cfg.autoOn); qSave()
+end)
+
+-- Reset key row
+local keyRow = Instance.new("Frame"); keyRow.Name = rStr()
+keyRow.Size = UDim2.new(1, -16, 0, ROW_H)
+keyRow.Position = UDim2.new(0, 8, 0, 10 + ROW_H + 6)
+keyRow.BackgroundColor3 = Color3.fromRGB(25,10,10)
+keyRow.BackgroundTransparency = 0.1
+keyRow.BorderSizePixel = 0
+keyRow.Parent = optPanel
+mkCorner(keyRow, M and 6 or 8)
+
+mkLabel(keyRow, {
+    Position = UDim2.new(0, 10, 0, 0), Size = UDim2.new(1, -70, 1, 0),
+    Text = "RESET KEY", Font = Enum.Font.GothamBold, TextSize = M and 10 or 12,
+    TextColor3 = Color3.fromRGB(235,235,240), TextXAlignment = Enum.TextXAlignment.Left,
+})
+
+local keyBtn = Instance.new("TextButton"); keyBtn.Name = rStr(); keyBtn.Parent = keyRow
+keyBtn.Size = UDim2.new(0, M and 46 or 52, 0, M and 20 or 23)
+keyBtn.Position = UDim2.new(1, -9, 0.5, 0); keyBtn.AnchorPoint = Vector2.new(1, 0.5)
+keyBtn.BackgroundColor3 = Color3.fromRGB(80,15,15)
+keyBtn.BorderSizePixel = 0
+keyBtn.Font = Enum.Font.GothamBold
+keyBtn.TextSize = M and 10 or 12
+keyBtn.TextColor3 = Color3.fromRGB(235,235,240)
+keyBtn.AutoButtonColor = false
+keyBtn.Selectable = false
+keyBtn.Text = cfg.resetKey
+mkCorner(keyBtn, 6)
+
+local listeningForKey = false
+keyBtn.MouseButton1Click:Connect(function()
+    listeningForKey = true
+    keyBtn.Text = "..."
+    keyBtn.BackgroundColor3 = Color3.fromRGB(220,30,30)
+end)
+
+-- ===== Core reset logic (unchanged) =====
+local resetRemote = nil
+local instaResetCooldown = false
+
+local o
+o = hookfunction(Instance.new("RemoteEvent").FireServer, newcclosure(function(self, ...)
+    if not resetRemote and self.Name:sub(1, 3) == "RE/" then
+        resetRemote = self
+    end
+    return o(self, ...)
+end))
+
+local function instareset()
+    if instaResetCooldown then return end
+    if not resetRemote then return end
+    instaResetCooldown = true
+    local oldChar = lp.Character
+    task.spawn(function()
+        while lp.Character == oldChar do
+            pcall(function() resetRemote:FireServer(GUID, lp, "balloon") end)
+            task.wait()
+        end
+        instaResetCooldown = false
+    end)
+end
+
+eb.MouseButton1Click:Connect(function()
+    instareset()
+    eb.Text = "RESETTING"
+    task.delay(0.5, function() eb.Text = "INSTA RESET" end)
+end)
+
+for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+    if obj:IsA("RemoteEvent") then
+        obj.OnClientEvent:Connect(function(...)
+            if not cfg.autoOn then return end
+            for _, arg in ipairs({...}) do
+                if type(arg) == "string" and arg:lower():find("jump higher") then
+                    instareset()
+                end
+            end
+        end)
+    end
+end
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+    if listeningForKey then
+        listeningForKey = false
+        cfg.resetKey = input.KeyCode.Name
+        keyBtn.Text = cfg.resetKey
+        keyBtn.BackgroundColor3 = Color3.fromRGB(80,15,15)
+        qSave()
+        return
+    end
+    if gpe then return end
+    if input.KeyCode.Name == cfg.resetKey then
+        instareset()
+    end
+end)
+
+-- ===== Dragging (drag via banner) =====
+local dragging = false; local dragStart, startPos
+banner.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true; dragStart = input.Position; startPos = outer.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local d = input.Position - dragStart
+        outer.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+    end
+end)
+end)
