@@ -5,7 +5,7 @@ local CONFIG = {
     ENTRY_DELAY = 0.3,
     COOLDOWN = 0.05,
     STEAL_RANGE = 7,
-    PRIME_RANGE = 61,
+    PRIME_RANGE = 63,
 }
 
 local Players   = game:GetService("Players")
